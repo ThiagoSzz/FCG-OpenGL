@@ -381,7 +381,7 @@ int main(int argc, char* argv[])
         #define PLANE  2
         #define HOUSE  3
 
-        // Desenhamos o modelo da esfera
+        /*// Desenhamos o modelo da esfera
         model = Matrix_Translate(-1.0f,0.0f,0.0f)
               * Matrix_Rotate_Z(0.6f)
               * Matrix_Rotate_X(0.2f)
@@ -395,7 +395,7 @@ int main(int argc, char* argv[])
               * Matrix_Rotate_X(g_AngleX + (float)glfwGetTime() * 0.1f);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, BUNNY);
-        DrawVirtualObject("bunny");
+        DrawVirtualObject("bunny");*/
 
         // Desenhamos o plano do chão
         model = Matrix_Translate(0.0f,-1.1f,0.0f);
@@ -403,9 +403,8 @@ int main(int argc, char* argv[])
         glUniform1i(object_id_uniform, PLANE);
         DrawVirtualObject("plane");
 
-        // Desenhamos o plano do chão
+        // Desenhamos a casa
         model = Matrix_Translate(0.0f,2.0f,0.0f);
-        model = Matrix_Scale(0.1f, 0.1f, 0.1f);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, HOUSE);
         DrawVirtualObject("house");
