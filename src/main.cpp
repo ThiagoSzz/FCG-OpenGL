@@ -222,7 +222,6 @@ int main(int argc, char* argv[])
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // Criamos uma janela do sistema operacional, com 800 colunas e 600 linhas
-    // de pixels, e com título "INF01047 ...".
     GLFWwindow* window;
     window = glfwCreateWindow(800, 600, "Destroy Game", NULL, NULL);
     if (!window)
@@ -265,13 +264,13 @@ int main(int argc, char* argv[])
     LoadTextureImage("../../data/tc-earth_nightmap_citylights.gif"); // TextureImage1
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
-    ObjModel spheremodel("../../data/sphere.obj");
+    /*ObjModel spheremodel("../../data/sphere.obj");
     ComputeNormals(&spheremodel);
     BuildTrianglesAndAddToVirtualScene(&spheremodel);
 
     ObjModel bunnymodel("../../data/bunny.obj");
     ComputeNormals(&bunnymodel);
-    BuildTrianglesAndAddToVirtualScene(&bunnymodel);
+    BuildTrianglesAndAddToVirtualScene(&bunnymodel);*/
 
     ObjModel planemodel("../../data/plane.obj");
     ComputeNormals(&planemodel);
@@ -405,7 +404,8 @@ int main(int argc, char* argv[])
         DrawVirtualObject("plane");
 
         // Desenhamos o plano do chão
-        model = Matrix_Translate(0.0f,0.0f,0.0f);
+        model = Matrix_Translate(0.0f,2.0f,0.0f);
+        model = Matrix_Scale(0.1f, 0.1f, 0.1f);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, HOUSE);
         DrawVirtualObject("house");
