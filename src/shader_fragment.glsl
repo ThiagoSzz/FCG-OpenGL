@@ -19,10 +19,11 @@ uniform mat4 view;
 uniform mat4 projection;
 
 // Identificador que define qual objeto está sendo desenhado no momento
-#define SPHERE 0
-#define BUNNY  1
-#define PLANE  2
-#define HOUSE  3
+#define SCENEOBJ 0
+#define SPHERE 1
+#define BUNNY  2
+#define PLANE  3
+#define HOUSE  4
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -96,7 +97,7 @@ void main()
         U = (teta + M_PI)/(2*M_PI);
         V = (phi + M_PI/2)/M_PI;
     }
-    else if ( (object_id == BUNNY) || (object_id == HOUSE) )
+    else if ( object_id == SCENEOBJ )
     {
         // [ok] PREENCHA AQUI as coordenadas de textura do coelho, computadas com
         // projeção planar XY em COORDENADAS DO MODELO. Utilize como referência
@@ -119,7 +120,7 @@ void main()
         U = (px-minx)/(maxx-minx);
         V = (py-minx)/(maxy-miny);
     }
-    else if ( object_id == PLANE )
+    else
     {
         // Coordenadas de textura do plano, obtidas do arquivo OBJ.
         U = texcoords.x;

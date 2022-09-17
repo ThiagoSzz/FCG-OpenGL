@@ -49,6 +49,13 @@
 #include "utils.h"
 #include "matrices.h"
 
+// Definições
+#define camera_speed       0.05f // Velocidade de movimentação da câmera
+#define sensitivity        0.50f // Sensibilidade do mouse
+#define sideways_slowdown  1.00f // Slowdown para movimentação para os lados
+
+#define SCENEOBJ 0
+
 // Estrutura que representa um modelo geométrico carregado a partir de um
 // arquivo ".obj". Veja https://en.wikipedia.org/wiki/Wavefront_.obj_file .
 struct ObjModel
@@ -87,7 +94,9 @@ void BuildTrianglesAndAddToVirtualScene(ObjModel*); // Constrói representação
 void ComputeNormals(ObjModel* model); // Computa normais de um ObjModel, caso não existam.
 void LoadShadersFromFiles(); // Carrega os shaders de vértice e fragmento, criando um programa de GPU
 void LoadTextureImage(const char* filename); // Função que carrega imagens de textura
-void DrawVirtualObject(const char* object_name); // Desenha um objeto armazenado em g_VirtualScene
+void DrawVirtualObject(const char* object_name, int ind_type=0); // Desenha um objeto armazenado em g_VirtualScene
+void getAllObjectsInFile(const char* filename);
+glm::vec4 GetUserInput(GLFWwindow* window, glm::vec4 camera_position, glm::vec4 camera_view, glm::vec4 camera_up);
 GLuint LoadShader_Vertex(const char* filename);   // Carrega um vertex shader
 GLuint LoadShader_Fragment(const char* filename); // Carrega um fragment shader
 void LoadShader(const char* filename, GLuint shader_id); // Função utilizada pelas duas acima
@@ -163,9 +172,9 @@ bool g_MiddleMouseButtonPressed = false; // Análogo para botão do meio do mous
 // usuário através do mouse (veja função CursorPosCallback()). A posição
 // efetiva da câmera é calculada dentro da função main(), dentro do loop de
 // renderização.
-float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
-float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
-float g_CameraDistance = 3.5f; // Distância da câmera para a origem
+float g_CameraTheta = -2.30f; // Ângulo no plano ZX em relação ao eixo Z
+float g_CameraPhi = 0.35f;   // Ângulo em relação ao eixo Y
+float g_CameraDistance = 2.0f; // Distância da câmera para a origem
 
 // Variáveis que controlam rotação do antebraço
 float g_ForearmAngleZ = 0.0f;
@@ -194,6 +203,9 @@ GLint bbox_max_uniform;
 
 // Número de texturas carregadas pela função LoadTextureImage()
 GLuint g_NumLoadedTextures = 0;
+
+char obj_names[200][50]={};
+int sizeObjModels;
 
 int main(int argc, char* argv[])
 {
@@ -259,27 +271,18 @@ int main(int argc, char* argv[])
     //
     LoadShadersFromFiles();
 
-    // Carregamos duas imagens para serem utilizadas como textura
-    LoadTextureImage("../../data/tc-earth_daymap_surface.jpg");      // TextureImage0
-    LoadTextureImage("../../data/tc-earth_nightmap_citylights.gif"); // TextureImage1
+    // Carrega a textura
+    LoadTextureImage("../../data/internal_ground_ao_texture.jpeg");
 
-    // Construímos a representação de objetos geométricos através de malhas de triângulos
-    /*ObjModel spheremodel("../../data/sphere.obj");
-    ComputeNormals(&spheremodel);
-    BuildTrianglesAndAddToVirtualScene(&spheremodel);
+    const char* filename = "../../data/japanese.obj";
 
-    ObjModel bunnymodel("../../data/bunny.obj");
-    ComputeNormals(&bunnymodel);
-    BuildTrianglesAndAddToVirtualScene(&bunnymodel);*/
+    // Carrega o arquivo dos objetos
+    ObjModel sceneobj(filename);
+    ComputeNormals(&sceneobj);
+    BuildTrianglesAndAddToVirtualScene(&sceneobj);
 
-    ObjModel planemodel("../../data/plane.obj");
-    ComputeNormals(&planemodel);
-    BuildTrianglesAndAddToVirtualScene(&planemodel);
-
-    // AQUI
-    ObjModel housemodel("../../data/cottage_obj.obj");
-    ComputeNormals(&housemodel);
-    BuildTrianglesAndAddToVirtualScene(&housemodel);
+    // Carrega todos os objetos do arquivo lido
+    getAllObjectsInFile(filename);
 
     if ( argc > 1 )
     {
@@ -297,6 +300,10 @@ int main(int argc, char* argv[])
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
+
+    // Inicializando os valores da posição da câmera e do up_vector
+    glm::vec4 camera_position_c  = glm::vec4(10.0f, 10.0f, 8.0f, 1.0f);
+    glm::vec4 camera_up_vector   = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
 
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
@@ -328,12 +335,11 @@ int main(int argc, char* argv[])
         float z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
         float x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
 
-        // Abaixo definimos as varáveis que efetivamente definem a câmera virtual.
-        // Veja slides 195-227 e 229-234 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
-        glm::vec4 camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
-        glm::vec4 camera_lookat_l    = glm::vec4(0.0f,0.0f,0.0f,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
-        glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
-        glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
+        // Usando "-y" para inverter o sentido do Cursor Up e Down
+        glm::vec4 camera_view_vector = glm::vec4(x,-y,z,0.0f);
+
+        // Movimentação da câmera com W, A, S, D
+        camera_position_c = GetUserInput(window, camera_position_c, camera_view_vector, camera_up_vector);
 
         // Computamos a matriz "View" utilizando os parâmetros da câmera para
         // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
@@ -345,7 +351,7 @@ int main(int argc, char* argv[])
         // Note que, no sistema de coordenadas da câmera, os planos near e far
         // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
         float nearplane = -0.1f;  // Posição do "near plane"
-        float farplane  = -100.0f; // Posição do "far plane"
+        float farplane  = -1000.0f; // Posição do "far plane"
 
         if (g_UsePerspectiveProjection)
         {
@@ -376,38 +382,15 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(view_uniform       , 1 , GL_FALSE , glm::value_ptr(view));
         glUniformMatrix4fv(projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
 
-        #define SPHERE 0
-        #define BUNNY  1
-        #define PLANE  2
-        #define HOUSE  3
-
-        /*// Desenhamos o modelo da esfera
-        model = Matrix_Translate(-1.0f,0.0f,0.0f)
-              * Matrix_Rotate_Z(0.6f)
-              * Matrix_Rotate_X(0.2f)
-              * Matrix_Rotate_Y(g_AngleY + (float)glfwGetTime() * 0.1f);
+        // Desenhamos os objetos
+        model = Matrix_Translate(0.0f,0.0f,0.0f);
+        model = Matrix_Scale(0.02f, 0.02f, 0.02f);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, SPHERE);
-        DrawVirtualObject("sphere");
+        glUniform1i(object_id_uniform, SCENEOBJ);
 
-        // Desenhamos o modelo do coelho
-        model = Matrix_Translate(1.0f,0.0f,0.0f)
-              * Matrix_Rotate_X(g_AngleX + (float)glfwGetTime() * 0.1f);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, BUNNY);
-        DrawVirtualObject("bunny");*/
-
-        // Desenhamos o plano do chão
-        model = Matrix_Translate(0.0f,-1.1f,0.0f);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, PLANE);
-        DrawVirtualObject("plane");
-
-        // Desenhamos a casa
-        model = Matrix_Translate(0.0f,2.0f,0.0f);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, HOUSE);
-        DrawVirtualObject("house");
+        for(int j=0; j<sizeObjModels; j++){
+            DrawVirtualObject(obj_names[j]);
+        }
 
         // Imprimimos na informação sobre a matriz de projeção sendo utilizada.
         TextRendering_ShowProjection(window);
@@ -436,6 +419,25 @@ int main(int argc, char* argv[])
 
     // Fim do programa
     return 0;
+}
+
+glm::vec4 GetUserInput(GLFWwindow* window, glm::vec4 camera_position, glm::vec4 camera_view, glm::vec4 camera_up){
+
+    // Referência: https://learnopengl.com/Getting-started/Camera
+
+    // camera_speed      = velocidade de mov. da câmera
+    // sideways_slowdown = velocidade de mov. lateral da câmera (caso a câmera se mova mais lentamente para os lados)
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        camera_position += camera_speed * camera_view;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        camera_position += camera_speed * -camera_view;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        camera_position += camera_speed * sideways_slowdown * crossproduct(camera_view, camera_up)/norm(crossproduct(camera_view, camera_up));
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        camera_position += camera_speed * sideways_slowdown * -crossproduct(camera_view, camera_up)/norm(crossproduct(camera_view, camera_up));
+
+    return camera_position;
 }
 
 // Função que carrega uma imagem para ser utilizada como textura
@@ -492,7 +494,7 @@ void LoadTextureImage(const char* filename)
 
 // Função que desenha um objeto armazenado em g_VirtualScene. Veja definição
 // dos objetos na função BuildTrianglesAndAddToVirtualScene().
-void DrawVirtualObject(const char* object_name)
+void DrawVirtualObject(const char* object_name, int ind_type)
 {
     // "Ligamos" o VAO. Informamos que queremos utilizar os atributos de
     // vértices apontados pelo VAO criado pela função BuildTrianglesAndAddToVirtualScene(). Veja
@@ -520,7 +522,28 @@ void DrawVirtualObject(const char* object_name)
 
     // "Desligamos" o VAO, evitando assim que operações posteriores venham a
     // alterar o mesmo. Isso evita bugs.
-    glBindVertexArray(0);
+    glBindVertexArray(ind_type);
+}
+
+void getAllObjectsInFile(const char* filename){
+
+    FILE *f = fopen(filename, "r");
+
+    char aux[30];
+
+    int i = 0;
+
+    while(fscanf(f, "%s ", aux) != EOF){
+        if(strcmp(aux, "o") == 0){
+            fscanf(f, "%s\n", obj_names[i]);
+            printf("%s\n", obj_names[i]);
+            i++;
+        }
+    }
+
+    fclose(f);
+
+    sizeObjModels = i;
 }
 
 // Função que carrega os shaders de vértices e de fragmentos que serão
