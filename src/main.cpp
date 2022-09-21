@@ -93,7 +93,7 @@ void PopMatrix(glm::mat4& M);
 void BuildTrianglesAndAddToVirtualScene(ObjModel*); // Constrói representação de um ObjModel como malha de triângulos para renderização
 void ComputeNormals(ObjModel* model); // Computa normais de um ObjModel, caso não existam.
 void LoadShadersFromFiles(); // Carrega os shaders de vértice e fragmento, criando um programa de GPU
-void LoadTextureImage(const char* filename); // Função que carrega imagens de textura
+void LoadTextureImage(const char* filename, int mode_id=GL_CLAMP_TO_EDGE); // Função que carrega imagens de textura
 void DrawVirtualObject(const char* object_name, int ind_type=0); // Desenha um objeto armazenado em g_VirtualScene
 void getAllObjectsInFile(const char* filename);
 glm::vec4 GetUserInput(GLFWwindow* window, glm::vec4 camera_position, glm::vec4 camera_view, glm::vec4 camera_up);
@@ -164,7 +164,7 @@ float g_AngleZ = 0.0f;
 
 // "g_LeftMouseButtonPressed = true" se o usuário está com o botão esquerdo do mouse
 // pressionado no momento atual. Veja função MouseButtonCallback().
-bool g_LeftMouseButtonPressed = false;
+bool g_LeftMouseButtonPressed = true;
 bool g_RightMouseButtonPressed = false; // Análogo para botão direito do mouse
 bool g_MiddleMouseButtonPressed = false; // Análogo para botão do meio do mouse
 
@@ -172,8 +172,8 @@ bool g_MiddleMouseButtonPressed = false; // Análogo para botão do meio do mous
 // usuário através do mouse (veja função CursorPosCallback()). A posição
 // efetiva da câmera é calculada dentro da função main(), dentro do loop de
 // renderização.
-float g_CameraTheta = -2.30f; // Ângulo no plano ZX em relação ao eixo Z
-float g_CameraPhi = 0.35f;   // Ângulo em relação ao eixo Y
+float g_CameraTheta = 3.0f; // Ângulo no plano ZX em relação ao eixo Z
+float g_CameraPhi = -0.1f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 2.0f; // Distância da câmera para a origem
 
 // Variáveis que controlam rotação do antebraço
@@ -205,7 +205,7 @@ GLint bbox_max_uniform;
 GLuint g_NumLoadedTextures = 0;
 
 char obj_names[200][50]={};
-int sizeObjModels;
+int sizeObjModels = 0;
 
 int main(int argc, char* argv[])
 {
@@ -253,6 +253,8 @@ int main(int argc, char* argv[])
     // ... ou rolar a "rodinha" do mouse.
     glfwSetScrollCallback(window, ScrollCallback);
 
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+
     // Indicamos que as chamadas OpenGL deverão renderizar nesta janela
     glfwMakeContextCurrent(window);
 
@@ -272,9 +274,11 @@ int main(int argc, char* argv[])
     LoadShadersFromFiles();
 
     // Carrega a textura
-    LoadTextureImage("../../data/internal_ground_ao_texture.jpeg");
+    LoadTextureImage("../../data/textures/terrain colour.png");
+    LoadTextureImage("../../data/textures/floppa.jpg");
+    LoadTextureImage("../../data/textures/modular_fort_01_trim_diff_4k.png");
 
-    const char* filename = "../../data/japanese.obj";
+    const char* filename = "../../data/castle.obj";
 
     // Carrega o arquivo dos objetos
     ObjModel sceneobj(filename);
@@ -283,6 +287,8 @@ int main(int argc, char* argv[])
 
     // Carrega todos os objetos do arquivo lido
     getAllObjectsInFile(filename);
+
+    printf("Carregou %d objetos.", sizeObjModels-1);
 
     if ( argc > 1 )
     {
@@ -302,7 +308,7 @@ int main(int argc, char* argv[])
     glFrontFace(GL_CCW);
 
     // Inicializando os valores da posição da câmera e do up_vector
-    glm::vec4 camera_position_c  = glm::vec4(10.0f, 10.0f, 8.0f, 1.0f);
+    glm::vec4 camera_position_c  = glm::vec4(5.0f, 1.0f, 5.0f, 1.0f);
     glm::vec4 camera_up_vector   = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
 
     // Ficamos em loop, renderizando, até que o usuário feche a janela
@@ -315,8 +321,8 @@ int main(int argc, char* argv[])
         // Vermelho, Verde, Azul, Alpha (valor de transparência).
         // Conversaremos sobre sistemas de cores nas aulas de Modelos de Iluminação.
         //
-        //           R     G     B     A
-        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        //           R       G       B       A
+        glClearColor(0.733f, 0.952f, 0.976f, 1.0f);
 
         // "Pintamos" todos os pixels do framebuffer com a cor definida acima,
         // e também resetamos todos os pixels do Z-buffer (depth buffer).
@@ -384,16 +390,12 @@ int main(int argc, char* argv[])
 
         // Desenhamos os objetos
         model = Matrix_Translate(0.0f,0.0f,0.0f);
-        model = Matrix_Scale(0.02f, 0.02f, 0.02f);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, SCENEOBJ);
 
         for(int j=0; j<sizeObjModels; j++){
+            glUniform1i(object_id_uniform, j);
             DrawVirtualObject(obj_names[j]);
         }
-
-        // Imprimimos na informação sobre a matriz de projeção sendo utilizada.
-        TextRendering_ShowProjection(window);
 
         // Imprimimos na tela informação sobre o número de quadros renderizados
         // por segundo (frames per second).
@@ -441,7 +443,7 @@ glm::vec4 GetUserInput(GLFWwindow* window, glm::vec4 camera_position, glm::vec4 
 }
 
 // Função que carrega uma imagem para ser utilizada como textura
-void LoadTextureImage(const char* filename)
+void LoadTextureImage(const char* filename, int mode_id)
 {
     printf("Carregando imagem \"%s\"... ", filename);
 
@@ -467,8 +469,8 @@ void LoadTextureImage(const char* filename)
     glGenSamplers(1, &sampler_id);
 
     // Veja slides 95-96 do documento Aula_20_Mapeamento_de_Texturas.pdf
-    glSamplerParameteri(sampler_id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glSamplerParameteri(sampler_id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glSamplerParameteri(sampler_id, GL_TEXTURE_WRAP_S, mode_id);
+    glSamplerParameteri(sampler_id, GL_TEXTURE_WRAP_T, mode_id);
 
     // Parâmetros de amostragem da textura.
     glSamplerParameteri(sampler_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -531,19 +533,15 @@ void getAllObjectsInFile(const char* filename){
 
     char aux[30];
 
-    int i = 0;
-
     while(fscanf(f, "%s ", aux) != EOF){
         if(strcmp(aux, "o") == 0){
-            fscanf(f, "%s\n", obj_names[i]);
-            printf("%s\n", obj_names[i]);
-            i++;
+            fscanf(f, "%s\n", obj_names[sizeObjModels]);
+            //printf("%s\n", obj_names[sizeObjModels]);
+            sizeObjModels++;
         }
     }
 
     fclose(f);
-
-    sizeObjModels = i;
 }
 
 // Função que carrega os shaders de vértices e de fragmentos que serão
@@ -1014,9 +1012,7 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
     }
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
     {
-        // Quando o usuário soltar o botão esquerdo do mouse, atualizamos a
-        // variável abaixo para false.
-        g_LeftMouseButtonPressed = false;
+        //Nada por enquanto...
     }
     if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
     {
