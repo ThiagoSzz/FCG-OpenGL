@@ -276,7 +276,6 @@ int main(int argc, char* argv[])
     // Carrega a textura
     LoadTextureImage("../../data/textures/terrain colour.png");
     LoadTextureImage("../../data/textures/floppa.jpg");
-    LoadTextureImage("../../data/textures/modular_fort_01_trim_diff_4k.png");
 
     const char* filename = "../../data/castle.obj";
 
