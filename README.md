@@ -5,12 +5,11 @@ TODO:<br>
 - [ ] Transformações geométricas de objetos virtuais
 - [ ] Implementar uma câmera look-at
 - [X] Implementar uma câmera câmera livre
-- [ ] Um objeto virtual ao menos deve ser copiado com duas ou mais instâncias
+- [X] Um objeto virtual ao menos deve ser copiado com duas ou mais instâncias
 - [ ] Utilizar ao menos três tipos de teste de intersecção (por exemplo, um teste cubo-cubo, um teste cubo-plano, e um teste ponto-esfera)
-- [ ] Incluir objetos com o modelo de iluminação difusa (Lambert)
-- [ ] Incluir objetos com o modelo de iluminação Blinn-Phong
+- [ ] Incluir objetos com o modelo de iluminação difusa (Lambert) e Blinn-Phong
 - [ ] Incluir objetos com o modelo de iluminação de Gouraud
-- [ ] Incluir objetos com o modelo de iluminação de Phong
-- [ ] Ao menos dois objetos virtuais de sua aplicação devem ter suas cores definidas através de texturas definidas por imagens (no mínimo duas imagens distintas)
+- [X] Incluir objetos com o modelo de iluminação de Phong
+- [X] Ao menos dois objetos virtuais de sua aplicação devem ter suas cores definidas através de texturas definidas por imagens (no mínimo duas imagens distintas)
 - [ ] Ao menos um objeto virtual de sua aplicação deve ter sua movimentação definida através de uma curva de Bézier cúbica. O objeto deve se movimentar de forma suave ao longo do espaço em um caminho curvo
-- [ ] Todas as movimentações de objetos (incluindo da câmera) devem ser computadas baseado no tempo (isto é, movimentações devem ocorrer sempre na mesma velocidade independente da velocidade da CPU onde o programa está sendo executado)
+- [X] Todas as movimentações de objetos (incluindo da câmera) devem ser computadas baseado no tempo (isto é, movimentações devem ocorrer sempre na mesma velocidade independente da velocidade da CPU onde o programa está sendo executado)
