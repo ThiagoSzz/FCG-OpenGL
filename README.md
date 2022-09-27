@@ -2,7 +2,7 @@ TODO:<br>
 
 - [X] Interação através de mouse e teclado
 - [X] Objetos virtuais representados através de malhas poligonais complexas
-- [ ] Transformações geométricas de objetos virtuais
+- [X] Transformações geométricas de objetos virtuais
 - [ ] Implementar uma câmera look-at
 - [X] Implementar uma câmera câmera livre
 - [X] Um objeto virtual ao menos deve ser copiado com duas ou mais instâncias
