@@ -48,14 +48,15 @@
 // Headers locais, definidos na pasta "include/"
 #include "utils.h"
 #include "matrices.h"
+#include "collisions.h"
 
 // Definições
 #define default_speed      5.50f // Velocidade padrão do jogador
 #define sensitivity        0.50f // Sensibilidade do mouse
-#define n_trees            300
-#define tree_types         6
+#define n_trees            250
+#define tree_types         1
 #define n_decoration       400
-#define decoration_types   5
+#define decoration_types   4
 #define n_rocks            250
 #define rock_types         7
 
@@ -148,19 +149,6 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 void CursorPosCallback(GLFWwindow* window, double xpos, double ypos);
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 
-// Definimos uma estrutura que armazenará dados necessários para renderizar
-// cada objeto da cena virtual.
-struct SceneObject
-{
-    std::string  name;        // Nome do objeto
-    size_t       first_index; // Índice do primeiro vértice dentro do vetor indices[] definido em BuildTrianglesAndAddToVirtualScene()
-    size_t       num_indices; // Número de índices do objeto dentro do vetor indices[] definido em BuildTrianglesAndAddToVirtualScene()
-    GLenum       rendering_mode; // Modo de rasterização (GL_TRIANGLES, GL_TRIANGLE_STRIP, etc.)
-    GLuint       vertex_array_object_id; // ID do VAO onde estão armazenados os atributos do modelo
-    glm::vec3    bbox_min; // Axis-Aligned Bounding Box do objeto
-    glm::vec3    bbox_max;
-};
-
 // Abaixo definimos variáveis globais utilizadas em várias funções do código.
 
 // A cena virtual é uma lista de objetos nomeados, guardados em um dicionário
@@ -215,12 +203,18 @@ float dt = 0;
 float dt1 = 0;
 float dt0 = 0;
 
-float x1 = 12.35f;
+float x1 = 19.14f;
 float y1 = 2.50f;
-float z1 = -85.13f;
+float z1 = -25.23f;
+
+float prev_x1 = x1;
+float prev_y1 = y1;
+float prev_z1 = z1;
 
 float axe_angle = 0.0f;
 float timer = 0.0f;
+bool can_chop = false;
+int choppable = 999;
 
 char obj_names[200][50]={};
 int sizeObjModels = 0;
@@ -361,23 +355,17 @@ int main(int argc, char* argv[])
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
 
-    const char* tree_names[tree_types] = {"Tree_average_regular_Cube.002",     "Tree_average_lush_Cube.004",
-                                          "Tree_Spruce_small_02_Cylinder.003", "Tree_Spruce_tiny_01_Cylinder.012",
-                                          "Tree_Spruce_tiny_02_Cylinder.014",  "Tree_Spruce_small_01_Cylinder.016"};
+    const char* tree_names[tree_types] = {"Tree_Spruce_small_01_Cylinder.016"};
 
-    const char* decoration_names[decoration_types] = {"Log_big_regular_Cylinder.015", "Grass_bush_high_01_Plane.002",
-                                                      "Grass_bush_low_01_Plane.005",  "Flower_bush_white_Plane.023",
-                                                      "Flower_bush_red_Plane.031"};
+    const char* decoration_names[decoration_types] = {"Grass_bush_high_01_Plane.002", "Grass_bush_low_01_Plane.005",
+                                                      "Flower_bush_white_Plane.023",  "Flower_bush_red_Plane.031"};
 
     glm::vec3 tree_position[n_trees];
-    float tree_rotation[n_trees];
-    float tree_scale[n_trees];
-
     glm::vec3 decoration_position[n_decoration];
-    float decoration_rotation[n_decoration];
-
     glm::vec3 rock_position[n_rocks];
-    float rock_rotation[n_rocks];
+    glm::vec3 log_position[n_rocks];
+
+    float tree_scale[n_trees];
     float rock_scale[n_rocks];
 
     float random_x, random_z;
@@ -393,8 +381,7 @@ int main(int argc, char* argv[])
         tree_position[i].x = random_x;
         tree_position[i].z = random_z;
 
-        tree_rotation[i] = (rand() % 360)*M_PI/180;
-        tree_scale[i] = (rand() % 50)/100.0 + 0.8;
+        tree_scale[i] = (rand() % 100)/100.0 + 0.5;
     }
 
     // Randomiza posições e rotações das árvores
@@ -407,8 +394,6 @@ int main(int argc, char* argv[])
 
         decoration_position[i].x = random_x;
         decoration_position[i].z = random_z;
-
-        decoration_rotation[i] = (rand() % 360)*M_PI/180;
     }
 
     for(int i=0; i<n_rocks; i++){
@@ -421,55 +406,85 @@ int main(int argc, char* argv[])
         rock_position[i].x = random_x;
         rock_position[i].z = random_z;
 
-        rock_rotation[i] = (rand() % 360)*M_PI/180;
         rock_scale[i] = ((rand() % 50)/100.0 + 0.8)*40.0;
     }
 
-    glm::vec3 obj;
+    for(int i=0; i<10; i++){
+        do{
+            random_x = rand() % 500 - 250;
+            random_z = rand() % 500 - 250;
+        }while((pow(random_x,2) + pow(random_z,2) <= pow(40,2)) ||
+               (pow(random_x,2) + pow(random_z,2) >= pow(150,2)));
+
+        log_position[i].x = random_x;
+        log_position[i].z = random_z;
+    }
 
     // Inicializando os valores da posição da câmera e do up_vector
     glm::vec4 camera_position_c;
-    glm::vec4 camera_up_vector   = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+    glm::vec4 camera_up_vector = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
 
     glm::vec2 p0, p1, p2, p3;
-    p0 = glm::vec2(-20.0f, -20.0f);
-    p1 = glm::vec2(20.0f, -20.0f);
-    p2 = glm::vec2(-20.0f, 20.0f);
-    p3 = glm::vec2(20.0f, 20.0f);
+    p0 = glm::vec2(-22.66f, -18.40f);
+    p1 = glm::vec2(-6.60f, -23.68f);
+    p2 = glm::vec2(8.76f, -17.90f);
+    p3 = glm::vec2(16.43f, -9.21f);
 
-    glm::vec3 bezier_obj, next_point, parallel;
-
-    float px0 = p0.x+1;
-    float px3 = p3.x-1;
-    float pz0 = p0.y+1;
-    float pz3 = p3.y-1;
+    glm::vec3 bezier_obj;
 
     float t = 0.0;
+
+    int n_spheres = 10;
+
+    glm::vec3 tree_spheres[n_spheres] = {glm::vec3(-9.10, 2.50, -7.91),
+                                         glm::vec3(-3.59, 2.50, -7.60),
+                                         glm::vec3(1.02, 2.50, -5.68),
+                                         glm::vec3(3.75, 2.50, -5.08),
+                                         glm::vec3(2.76, 2.50, -1.09),
+                                         glm::vec3(5.68, 2.50, 3.07),
+                                         glm::vec3(1.81, 2.50, 3.25),
+                                         glm::vec3(-5.05, 2.50, 5.33),
+                                         glm::vec3(-9.95, 2.50, 6.65),
+                                         glm::vec3(-5.37, 2.50, -1.88)};
+
+    bool turn_1 = false;
+    int dir = 0;
 
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while ((!glfwWindowShouldClose(window))||(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS))
     {
-        if(((bezier_obj.x <= px0)&&(bezier_obj.z <= pz0))&&(t >= 1.0)){
-            p0 = glm::vec2(-20.0f, -20.0f);
-            p1 = glm::vec2(20.0f, -20.0f);
-            p2 = glm::vec2(-20.0f, 20.0f);
-            p3 = glm::vec2(20.0f, 20.0f);
+        //printf("glm::vec2(%.2ff, %.2ff);\n", camera_position_c.x, camera_position_c.z);
 
-            t = 0;
+        if((turn_1) && (t >= 1.0)){
+            p0 = glm::vec2(-22.66f, -18.40f);
+            p1 = glm::vec2(-6.60f, -23.68f);
+            p2 = glm::vec2(8.76f, -17.90f);
+            p3 = glm::vec2(16.43f, -9.21f);
+
+            if((bezier_obj.x >= 16.43f) && (bezier_obj.z >= -9.21f)){
+                turn_1 = false;
+                t = 0;
+                dir = 0;
+            }
         }
-        else if(((bezier_obj.x >= px3)&&(bezier_obj.z >= pz3))&&(t >= 1.0)){
-            p0 = glm::vec2(20.0f, 20.0f);
-            p1 = glm::vec2(-20.0f, 20.0f);
-            p2 = glm::vec2(20.0f, -20.0f);
-            p3 = glm::vec2(-20.0f, -20.0f);
+        else if((!turn_1) && (t >= 1.0)){
+            p0 = glm::vec2(16.43f, -9.21f);
+            p1 = glm::vec2(8.76f, -17.90f);
+            p2 = glm::vec2(-6.60f, -23.68f);
+            p3 = glm::vec2(-22.66f, -18.40f);
 
-            t = 0;
+            if((bezier_obj.x <= -22.66f) && (bezier_obj.z >= -18.40f)){
+                turn_1 = true;
+                t = 0;
+                dir = 1;
+            }
         }
 
         t += dt*0.1;
 
         bezier_obj = getBezierCurve(p0, p1, p2, p3, t);
-        next_point = getBezierCurve(p0, p1, p2, p3, t+0.01f);
+
+        /*next_point = getBezierCurve(p0, p1, p2, p3, t+0.01f);
 
         parallel = glm::vec3(bezier_obj.x+0.01f, bezier_obj.y, bezier_obj.z);
 
@@ -480,11 +495,14 @@ int main(int argc, char* argv[])
             -glm::vec4(parallel.x, parallel.y, parallel.z, 1.0);
 
         float cos_ang = dotproduct(u, v)/(norm(u)*norm(v));
-        float acos_ang = acos(cos_ang);
+        float acos_ang = acos(cos_ang);*/
 
         glClearColor(0.433, 0.773, 0.984, 1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(program_id);
+
+        prev_x1 = x1;
+        prev_z1 = z1;
 
         float r = g_CameraDistance;
         float y = r*sin(g_CameraPhi);
@@ -545,13 +563,31 @@ int main(int argc, char* argv[])
             for(i=current_i; i<(current_i)+amount; i++){
                 // Desenhamos os objetos
                 model = Matrix_Translate(tree_position[i].x, -0.1f, tree_position[i].z)
-                      * Matrix_Rotate_Y(tree_rotation[i])
                       * Matrix_Rotate_X(sin(2*dt1)*0.005)
                       * Matrix_Scale(tree_scale[i], tree_scale[i], tree_scale[i]);
                 glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-
                 glUniform1i(object_id_uniform, TREES);
                 DrawVirtualObject(tree_names[j]);
+
+                if(treeCollision(camera_position_c,
+                                 g_VirtualScene[tree_names[j]],
+                                 tree_position[i],
+                                 tree_scale[i],
+                                 3.5f)){
+
+                    x1 = prev_x1;
+                    z1 = prev_z1;
+                }
+
+                if(treeCollision(camera_position_c,
+                                 g_VirtualScene[tree_names[j]],
+                                 tree_position[i],
+                                 tree_scale[i],
+                                 3.2f)){
+
+                    can_chop = true;
+                    choppable = i;
+                }
             }
 
             current_i = i;
@@ -563,16 +599,9 @@ int main(int argc, char* argv[])
         for(int j=0; j<decoration_types; j++){
             for(i=current_i; i<(current_i)+amount; i++){
                 // Desenhamos os objetos
-                if(strcmp(decoration_names[j], "Log_big_regular_Cylinder.015") != 0)
-                    model = Matrix_Translate(decoration_position[i].x, 0.0f, decoration_position[i].z)
-                          * Matrix_Rotate_Y(decoration_rotation[i]);
-                else
-                    model = Matrix_Translate(decoration_position[i].x, -0.1f, decoration_position[i].z)
-                          * Matrix_Rotate_Y(decoration_rotation[i])
-                          * Matrix_Scale(0.8f, 0.8f, 0.8f);
+                model = Matrix_Translate(decoration_position[i].x, 0.0f, decoration_position[i].z);
 
                 glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-
                 glUniform1i(object_id_uniform, TREES);
                 DrawVirtualObject(decoration_names[j]);
             }
@@ -587,15 +616,41 @@ int main(int argc, char* argv[])
             for(i=current_i; i<(current_i)+amount; i++){
                 // Desenhamos os objetos
                 model = Matrix_Translate(rock_position[i].x, 0.0f, rock_position[i].z)
-                      * Matrix_Rotate_Y(rock_rotation[i])
                       * Matrix_Scale(rock_scale[i], rock_scale[i], rock_scale[i]);
                 glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
 
                 glUniform1i(object_id_uniform, MOUNTAINS);
                 DrawVirtualObject(obj_names[j]);
+
+                if(bigTreeCollision(camera_position_c,
+                                    glm::vec3(rock_position[i].x, 0.0f, rock_position[i].z),
+                                    rock_scale[i]+2.0f)){
+
+                    x1 = prev_x1;
+                    z1 = prev_z1;
+                }
             }
 
             current_i = i;
+        }
+
+        for(i=0; i<10; i++){
+            // Desenhamos os objetos
+            model = Matrix_Translate(log_position[i].x, -0.1f, log_position[i].z)
+                  * Matrix_Scale(0.8f, 0.8f, 0.8f);
+
+            if(logCollision(camera_position_c,
+                                  g_VirtualScene["Log_big_regular_Cylinder.015"],
+                                  log_position[i],
+                                  0.8f)){
+
+                x1 = prev_x1;
+                z1 = prev_z1;
+            }
+
+            glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            glUniform1i(object_id_uniform, TREES);
+            DrawVirtualObject("Log_big_regular_Cylinder.015");
         }
 
         // Desenhamos os objetos
@@ -605,10 +660,20 @@ int main(int argc, char* argv[])
         glUniform1i(object_id_uniform, BIGTREE);
         DrawVirtualObject("fattree_Mesh.003");
 
+        for(int i=0; i<n_spheres; i++){
+            if(bigTreeCollision(camera_position_c,
+                                tree_spheres[i],
+                                5.0f)){
+
+                x1 = prev_x1;
+                z1 = prev_z1;
+            }
+        }
+
         // Desenhamos os objetos
-        model = Matrix_Translate(-10.0f+bezier_obj.x, 0.1f, -15.0f+bezier_obj.z)
+        model = Matrix_Translate(bezier_obj.x, 0.1f, bezier_obj.z)
               * Matrix_Rotate_X(sin(8*dt1)*0.05)
-              * Matrix_Rotate_Y(acos_ang)
+              * Matrix_Rotate_Y((dir*180+180)*M_PI/180.0)
               * Matrix_Scale(0.03f, 0.03f, 0.03f);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, CHICKEN_LEG);
@@ -638,6 +703,11 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, CHARACTER);
         DrawVirtualObject("knight");
+        model = Matrix_Translate(-4.0f, 0.0f, -10.02f)
+              * Matrix_Rotate_Y(180*M_PI/180.0)
+              * Matrix_Rotate_X(sin(2*dt1)*0.005)
+              * Matrix_Scale(6.8f, 6.8f, 6.8f);
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, CHARACTER_CAPA);
         DrawVirtualObject("capa");
 
@@ -703,7 +773,7 @@ glm::vec4 GetUserInput(GLFWwindow* window, float x, float y, float z){
         mov = 6;
     }
 
-    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS){
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && can_chop){
         axe_angle = sin(8*timer)*20;
         timer += dt;
     }
@@ -715,6 +785,7 @@ glm::vec4 GetUserInput(GLFWwindow* window, float x, float y, float z){
         else{
             axe_angle = 0;
             timer = 0;
+            can_chop = false;
         }
     }
 
@@ -1760,4 +1831,3 @@ void PrintObjModelInfo(ObjModel* model)
 
 // set makeprg=cd\ ..\ &&\ make\ run\ >/dev/null
 // vim: set spell spelllang=pt_br :
-
