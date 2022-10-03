@@ -12,6 +12,6 @@ struct SceneObject
     glm::vec3    bbox_max;
 };
 
-bool bigTreeCollision(glm::vec4 point, glm::vec3 sphere, float radius);
-bool treeCollision(glm::vec4 point, SceneObject object, glm::vec3 position, float scale, float small_value);
-bool logCollision(glm::vec4 point, SceneObject object, glm::vec3 position, float scale);
+bool pointSphereCollision(glm::vec4 point, glm::vec3 sphere, float radius);
+bool pointCubeCollision(glm::vec4 point, SceneObject object, glm::vec3 position, float scale, float small_value);
+bool cubeCubeCollision(glm::vec4 point, SceneObject object, glm::vec3 position, float scale);
