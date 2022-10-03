@@ -6,7 +6,7 @@ TODO:<br>
 - [X] Implementar uma câmera look-at
 - [X] Implementar uma câmera câmera livre
 - [X] Um objeto virtual ao menos deve ser copiado com duas ou mais instâncias
-- [ ] Utilizar ao menos três tipos de teste de intersecção (por exemplo, um teste cubo-cubo, um teste cubo-plano, e um teste ponto-esfera)
+- [X] Utilizar ao menos três tipos de teste de intersecção (por exemplo, um teste cubo-cubo, um teste cubo-plano, e um teste ponto-esfera)
 - [X] Incluir objetos com o modelo de iluminação difusa (Lambert) e Blinn-Phong
 - [ ] Incluir objetos com o modelo de iluminação de Gouraud
 - [X] Incluir objetos com o modelo de iluminação de Phong
