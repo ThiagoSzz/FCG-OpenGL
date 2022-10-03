@@ -135,9 +135,9 @@ void main()
 
         // Propriedades espectrais
         Kd = texture(TextureImage4, vec2(U,V)).rgb;
-        Ks = vec3(0.0,0.0,0.0);
+        Ks = vec3(1.0,1.0,1.0);
         Ka = Kd/2.0;
-        q  = 1.0;
+        q  = 50.0;
     }
     else if ( object_id == AXE )
     {
@@ -179,9 +179,9 @@ void main()
 
         // Propriedades espectrais
         Kd = texture(TextureImage5, vec2(U,V)).rgb;
-        Ks = vec3(0.0,0.0,0.0);
+        Ks = vec3(1.0,1.0,1.0);
         Ka = Kd/2.0;
-        q  = 1.0;
+        q  = 50.0;
     }
     else if ( object_id == CHICKEN_LEG )
     {
