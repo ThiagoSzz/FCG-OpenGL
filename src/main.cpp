@@ -53,11 +53,12 @@
 // Definições
 #define default_speed      5.50f // Velocidade padrão do jogador
 #define sensitivity        0.50f // Sensibilidade do mouse
-#define n_trees            250
+#define delay_cut_tree     3.0f
+#define n_trees            200
 #define tree_types         1
 #define n_decoration       400
 #define decoration_types   4
-#define n_rocks            250
+#define n_rocks            200
 #define rock_types         7
 
 #define TERRAIN 0
@@ -121,6 +122,7 @@ void LoadShader(const char* filename, GLuint shader_id); // Função utilizada p
 GLuint CreateGpuProgram(GLuint vertex_shader_id, GLuint fragment_shader_id); // Cria um programa de GPU
 void PrintObjModelInfo(ObjModel*); // Função para debugging
 glm::vec3 getBezierCurve(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, glm::vec2 p3, float t);
+glm::vec3 get3DBezierCurve(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t);
 
 // Declaração de funções auxiliares para renderizar texto dentro da janela
 // OpenGL. Estas funções estão definidas no arquivo "textrendering.cpp".
@@ -173,9 +175,11 @@ bool g_MiddleMouseButtonPressed = false; // Análogo para botão do meio do mous
 // usuário através do mouse (veja função CursorPosCallback()). A posição
 // efetiva da câmera é calculada dentro da função main(), dentro do loop de
 // renderização.
-float g_CameraTheta = -0.2f; // Ângulo no plano ZX em relação ao eixo Z
-float g_CameraPhi = -0.2f;   // Ângulo em relação ao eixo Y
+float g_CameraTheta = -12.63; // Ângulo no plano ZX em relação ao eixo Z
+float g_CameraPhi =  0.06;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 2.0f; // Distância da câmera para a origem
+
+float r, x, y, z;
 
 // Variável que controla o tipo de projeção utilizada: perspectiva ou ortográfica.
 bool g_UsePerspectiveProjection = true;
@@ -203,9 +207,9 @@ float dt = 0;
 float dt1 = 0;
 float dt0 = 0;
 
-float x1 = 19.14f;
+float x1 = 3.77f;
 float y1 = 2.50f;
-float z1 = -25.23f;
+float z1 = -26.03f;
 
 float prev_x1 = x1;
 float prev_y1 = y1;
@@ -215,8 +219,16 @@ float axe_angle = 0.0f;
 float timer = 0.0f;
 bool can_chop = false;
 int choppable = 999;
+int broken_trees = 0;
+bool broke_tree[n_trees];
+glm::vec2 trunk_pos[n_trees];
+char delay_left[30] = "";
 
-char obj_names[200][50]={};
+bool collided_with_npc = false;
+bool accepted_quest = false;
+bool start_game = false;
+
+char obj_names[100][50]={};
 int sizeObjModels = 0;
 
 int main(int argc, char* argv[])
@@ -254,9 +266,16 @@ int main(int argc, char* argv[])
         std::exit(EXIT_FAILURE);
     }
 
+    // Referência: https://stackoverflow.com/questions/44321902/glfw-setwindowicon
+    GLFWimage images[1];
+    images[0].pixels = stbi_load("../../data/textures/icon.png", &images[0].width, &images[0].height, 0, 4); //rgba channels
+    glfwSetWindowIcon(window, 1, images);
+    stbi_image_free(images[0].pixels);
+
     // Definimos a função de callback que será chamada sempre que o usuário
     // movimentar o cursor do mouse...
     glfwSetCursorPosCallback(window, CursorPosCallback);
+    glfwSetMouseButtonCallback(window, MouseButtonCallback);
 
     // Desabilita o ícone do cursor e mantém ele na janela caso saia
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -373,15 +392,17 @@ int main(int argc, char* argv[])
     // Randomiza posições e rotações das árvores
     for(int i=0; i<n_trees; i++){
         do{
-            random_x = rand() % 500 - 250;
-            random_z = rand() % 500 - 250;
+            random_x = rand() % 500 - 100;
+            random_z = rand() % 500 - 100;
         }while((pow(random_x,2) + pow(random_z,2) <= pow(50,2)) ||
                (pow(random_x,2) + pow(random_z,2) >= pow(150,2)));
 
         tree_position[i].x = random_x;
         tree_position[i].z = random_z;
 
-        tree_scale[i] = (rand() % 100)/100.0 + 0.5;
+        tree_scale[i] = (rand() % 80)/100.0 + 0.5;
+
+        broke_tree[i] = false;
     }
 
     // Randomiza posições e rotações das árvores
@@ -413,16 +434,17 @@ int main(int argc, char* argv[])
         do{
             random_x = rand() % 500 - 250;
             random_z = rand() % 500 - 250;
-        }while((pow(random_x,2) + pow(random_z,2) <= pow(40,2)) ||
+        }while((pow(random_x,2) + pow(random_z,2) <= pow(50,2)) ||
                (pow(random_x,2) + pow(random_z,2) >= pow(150,2)));
 
         log_position[i].x = random_x;
         log_position[i].z = random_z;
     }
 
-    // Inicializando os valores da posição da câmera e do up_vector
-    glm::vec4 camera_position_c;
-    glm::vec4 camera_up_vector = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+    // Inicializando os valores da posição da câmera e do up_vector para a câmera look-at
+    glm::vec4 camera_position_c =  glm::vec4(62.26f, 15.0f, -49.71f, 1.0f);
+    glm::vec4 camera_view_vector = glm::vec4(x1, 2.5f, z1, 1.0f) - glm::vec4(62.26f, 15.0f, -49.71f, 1.0f);
+    glm::vec4 camera_up_vector =   glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
 
     glm::vec2 p0, p1, p2, p3;
     p0 = glm::vec2(-22.66f, -18.40f);
@@ -430,7 +452,7 @@ int main(int argc, char* argv[])
     p2 = glm::vec2(8.76f, -17.90f);
     p3 = glm::vec2(16.43f, -9.21f);
 
-    glm::vec3 bezier_obj;
+    glm::vec3 bezier_obj, bezier_camera;
 
     float t = 0.0;
 
@@ -450,11 +472,33 @@ int main(int argc, char* argv[])
     bool turn_1 = false;
     int dir = 0;
 
+    int level = 0;
+    char const* dialog_text[15] = {"               Ola caro lenhador, o inverno esta se aproximando                ",
+                                   "e os moradores de uma vila proxima daqui precisam de madeira para se aquecerem.",
+                                   "              Caso deseje nos ajudar a coleta-las, pressione [Y].              ",
+
+                                   "                             Certo, muito obrigado!                            ",
+                                   "              Voce pode comecar coletando a madeira de 3 arvores.              ",
+                                   "                           Estarei aqui te esperando!                          ",
+
+                                   "                   Nos ficamos muito gratos pela sua ajuda!                    ",
+                                   "                Porem, precisaremos de mais um pouco de madeira.               ",
+                                   "                  Precisaremos da madeira de mais 5 arvores.                   ",
+
+                                   "               Temos alguns moradores novos na nossa vila, entao               ",
+                                   "                   precisaremos de mais madeira. Poderia nos                   ",
+                                   "                 ajudar coletando a madeira de mais 10 arvores?                ",
+
+                                   "                        Muito obrigado pela sua ajuda!                         ",
+                                   "                  Com certeza as madeiras coletadas por voce                   ",
+                                   "                  ajudarao a nos aquecer no proximo inverno.                   "};
+
+    bool camera_type = false;
+    char broken[20] = "0";
+
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while ((!glfwWindowShouldClose(window))||(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS))
     {
-        //printf("glm::vec2(%.2ff, %.2ff);\n", camera_position_c.x, camera_position_c.z);
-
         if((turn_1) && (t >= 1.0)){
             p0 = glm::vec2(-22.66f, -18.40f);
             p1 = glm::vec2(-6.60f, -23.68f);
@@ -480,22 +524,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        t += dt*0.1;
-
         bezier_obj = getBezierCurve(p0, p1, p2, p3, t);
-
-        /*next_point = getBezierCurve(p0, p1, p2, p3, t+0.01f);
-
-        parallel = glm::vec3(bezier_obj.x+0.01f, bezier_obj.y, bezier_obj.z);
-
-        glm::vec4 u, v;
-        u = glm::vec4(bezier_obj.x, bezier_obj.y, bezier_obj.z, 1.0)
-            -glm::vec4(next_point.x, next_point.y, next_point.z, 1.0);
-        v = glm::vec4(bezier_obj.x, bezier_obj.y, bezier_obj.z, 1.0)
-            -glm::vec4(parallel.x, parallel.y, parallel.z, 1.0);
-
-        float cos_ang = dotproduct(u, v)/(norm(u)*norm(v));
-        float acos_ang = acos(cos_ang);*/
 
         glClearColor(0.433, 0.773, 0.984, 1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -504,19 +533,47 @@ int main(int argc, char* argv[])
         prev_x1 = x1;
         prev_z1 = z1;
 
-        float r = g_CameraDistance;
-        float y = r*sin(g_CameraPhi);
-        float z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
-        float x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
+        r = g_CameraDistance;
+        y = r*sin(g_CameraPhi);
+        z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
+        x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
 
         dt1 = glfwGetTime();
         dt = dt1 - dt0;
 
-        // Usando "-y" para inverter o sentido do Cursor Up e Down
-        glm::vec4 camera_view_vector = glm::vec4(x,-y,z,0.0f);
+        //printf("glm::vec2(%.2ff, %.2ff);\n", camera_position_c.x, camera_position_c.z);
+        //printf("%.2f %.2f\n", g_CameraTheta, g_CameraPhi);
 
-        // Movimentação da câmera com W, A, S, D
-        camera_position_c = GetUserInput(window, x, y, z);
+        if(start_game){
+            t += dt*0.1;
+
+            if(!camera_type){
+                // Curva de Bezier para a câmera
+                bezier_camera = get3DBezierCurve(glm::vec3(62.26f, 15.0f, -49.71f),
+                                                 glm::vec3(37.03f, 7.0f,  -40.22f),
+                                                 glm::vec3(12.83f, 5.0f,  -34.03f),
+                                                 glm::vec3(x1,     2.5f,     z1-1), t);
+
+                // Câmera look-at "cut-scene"
+                camera_position_c = glm::vec4(bezier_camera.x, bezier_camera.y, bezier_camera.z, 1.0f);
+                camera_view_vector = glm::vec4(x1, 2.5f, z1, 1.0f) - glm::vec4(bezier_camera.x, bezier_camera.y, bezier_camera.z, 1.0f);
+
+                if(t >= 1.0){
+                    camera_type = true;
+
+                    g_CameraTheta = -12.63;
+                    g_CameraPhi =  0.06;
+                }
+            }
+            else{
+                // Câmera livre
+                camera_position_c = GetUserInput(window, x, y, z);
+                camera_view_vector = glm::vec4(x, -y, z, 0.0f);
+            }
+        }
+        else{
+            GetUserInput(window, x, y, z);
+        }
 
         glm::mat4 view = Matrix_Camera_View(camera_position_c,
                                             camera_view_vector,
@@ -527,21 +584,9 @@ int main(int argc, char* argv[])
         float nearplane = -0.1f;  // Posição do "near plane"
         float farplane  = -400.0f; // Posição do "far plane"
 
-        if (g_UsePerspectiveProjection)
-        {
-            // Projeção Perspectiva.
-            float field_of_view = 3.141592 / 3.0f;
-            projection = Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
-        }
-        else
-        {
-            // Projeção Ortográfica.
-            float t = 1.5f*g_CameraDistance/2.5f;
-            float b = -t;
-            float r = t*g_ScreenRatio;
-            float l = -r;
-            projection = Matrix_Orthographic(l, r, b, t, nearplane, farplane);
-        }
+        // Projeção Perspectiva.
+        float field_of_view = 3.141592 / 3.0f;
+        projection = Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
 
         glUniformMatrix4fv(view_uniform       , 1 , GL_FALSE , glm::value_ptr(view));
         glUniformMatrix4fv(projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
@@ -561,32 +606,40 @@ int main(int argc, char* argv[])
 
         for(int j=0; j<tree_types; j++){
             for(i=current_i; i<(current_i)+amount; i++){
-                // Desenhamos os objetos
-                model = Matrix_Translate(tree_position[i].x, -0.1f, tree_position[i].z)
-                      * Matrix_Rotate_X(sin(2*dt1)*0.005)
-                      * Matrix_Scale(tree_scale[i], tree_scale[i], tree_scale[i]);
-                glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-                glUniform1i(object_id_uniform, TREES);
-                DrawVirtualObject(tree_names[j]);
+                if(!broke_tree[i]){
+                    model = Matrix_Translate(tree_position[i].x, -0.1f, tree_position[i].z)
+                          * Matrix_Rotate_X(sin(2*dt1)*0.005)
+                          * Matrix_Scale(tree_scale[i], tree_scale[i], tree_scale[i]);
+                    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                    glUniform1i(object_id_uniform, TREES);
+                    DrawVirtualObject(tree_names[j]);
 
-                if(treeCollision(camera_position_c,
-                                 g_VirtualScene[tree_names[j]],
-                                 tree_position[i],
-                                 tree_scale[i],
-                                 3.5f)){
+                    if(pointCubeCollision(camera_position_c,
+                                          g_VirtualScene[tree_names[j]],
+                                          tree_position[i],
+                                          tree_scale[i],
+                                          3.5f)){
 
-                    x1 = prev_x1;
-                    z1 = prev_z1;
+                        x1 = prev_x1;
+                        z1 = prev_z1;
+                    }
+
+                    if(pointCubeCollision(camera_position_c,
+                                          g_VirtualScene[tree_names[j]],
+                                          tree_position[i],
+                                          tree_scale[i],
+                                          3.2f)){
+
+                        can_chop = true;
+                        choppable = i;
+                    }
                 }
-
-                if(treeCollision(camera_position_c,
-                                 g_VirtualScene[tree_names[j]],
-                                 tree_position[i],
-                                 tree_scale[i],
-                                 3.2f)){
-
-                    can_chop = true;
-                    choppable = i;
+                else{
+                    model = Matrix_Translate(trunk_pos[i].x+(21.0f*tree_scale[i]), -0.1f, trunk_pos[i].y)
+                          * Matrix_Scale(tree_scale[i], tree_scale[i], tree_scale[i]);
+                    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                    glUniform1i(object_id_uniform, TREES);
+                    DrawVirtualObject("Stump_average_low_Cube.014");
                 }
             }
 
@@ -612,7 +665,7 @@ int main(int argc, char* argv[])
         current_i = 0;
         amount = int(n_rocks/rock_types);
 
-        for(int j=0; j<rock_types; j++){
+        for(int j=0; j<sizeObjModels; j++){
             for(i=current_i; i<(current_i)+amount; i++){
                 // Desenhamos os objetos
                 model = Matrix_Translate(rock_position[i].x, 0.0f, rock_position[i].z)
@@ -622,7 +675,7 @@ int main(int argc, char* argv[])
                 glUniform1i(object_id_uniform, MOUNTAINS);
                 DrawVirtualObject(obj_names[j]);
 
-                if(bigTreeCollision(camera_position_c,
+                if(pointSphereCollision(camera_position_c,
                                     glm::vec3(rock_position[i].x, 0.0f, rock_position[i].z),
                                     rock_scale[i]+2.0f)){
 
@@ -639,10 +692,10 @@ int main(int argc, char* argv[])
             model = Matrix_Translate(log_position[i].x, -0.1f, log_position[i].z)
                   * Matrix_Scale(0.8f, 0.8f, 0.8f);
 
-            if(logCollision(camera_position_c,
-                                  g_VirtualScene["Log_big_regular_Cylinder.015"],
-                                  log_position[i],
-                                  0.8f)){
+            if(cubeCubeCollision(camera_position_c,
+                                 g_VirtualScene["Log_big_regular_Cylinder.015"],
+                                 log_position[i],
+                                 0.8f)){
 
                 x1 = prev_x1;
                 z1 = prev_z1;
@@ -661,9 +714,9 @@ int main(int argc, char* argv[])
         DrawVirtualObject("fattree_Mesh.003");
 
         for(int i=0; i<n_spheres; i++){
-            if(bigTreeCollision(camera_position_c,
-                                tree_spheres[i],
-                                5.0f)){
+            if(pointSphereCollision(camera_position_c,
+                                    tree_spheres[i],
+                                    5.0f)){
 
                 x1 = prev_x1;
                 z1 = prev_z1;
@@ -678,23 +731,59 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, CHICKEN_LEG);
         DrawVirtualObject("laranja1");
-        DrawVirtualObject("laranja2");
-        DrawVirtualObject("laranja3");
         glUniform1i(object_id_uniform, CHICKEN_BODY);
         DrawVirtualObject("branco1");
-        DrawVirtualObject("branco2");
-        DrawVirtualObject("branco3");
         glUniform1i(object_id_uniform, CHICKEN_EYE);
         DrawVirtualObject("preto1");
-        DrawVirtualObject("preto2");
-        DrawVirtualObject("preto3");
         DrawVirtualObject("preto1_1");
-        DrawVirtualObject("preto2_1");
-        DrawVirtualObject("preto3_1");
         glUniform1i(object_id_uniform, CHICKEN_COMB);
         DrawVirtualObject("vermelho1");
+
+        // Desenhamos os objetos
+        model = Matrix_Translate(bezier_obj.x + 2.0f + sin(0.5*dt1)*3, 0.1f, bezier_obj.z + 2.0f + sin(0.5*dt1)*3)
+              * Matrix_Rotate_X(sin(8*dt1)*0.05)
+              * Matrix_Rotate_Y((dir*180+180)*M_PI/180.0)
+              * Matrix_Scale(0.03f, 0.03f, 0.03f);
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, CHICKEN_LEG);
+        DrawVirtualObject("laranja2");
+        glUniform1i(object_id_uniform, CHICKEN_BODY);
+        DrawVirtualObject("branco2");
+        glUniform1i(object_id_uniform, CHICKEN_EYE);
+        DrawVirtualObject("preto2");
+        DrawVirtualObject("preto2_1");
+        glUniform1i(object_id_uniform, CHICKEN_COMB);
         DrawVirtualObject("vermelho2");
+
+        // Desenhamos os objetos
+        model = Matrix_Translate(bezier_obj.x + 0.5f + sin(0.5*dt1)*3, 0.1f, bezier_obj.z + 0.5f + sin(0.5*dt1)*3)
+              * Matrix_Rotate_X(sin(8*dt1)*0.05)
+              * Matrix_Rotate_Y((dir*180+180)*M_PI/180.0)
+              * Matrix_Scale(0.03f, 0.03f, 0.03f);
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, CHICKEN_LEG);
+        DrawVirtualObject("laranja3");
+        glUniform1i(object_id_uniform, CHICKEN_BODY);
+        DrawVirtualObject("branco3");
+        glUniform1i(object_id_uniform, CHICKEN_EYE);
+        DrawVirtualObject("preto3");
+        DrawVirtualObject("preto3_1");
+        glUniform1i(object_id_uniform, CHICKEN_COMB);
         DrawVirtualObject("vermelho3");
+
+        if(camera_type){
+            // Desenhamos os objetos
+            model = Matrix_Translate(x1+x*0.1f, y1-0.65f, z1+z*0.1f)
+                  * Matrix_Rotate_Y(g_CameraTheta + 90*M_PI/180.0)
+                  * Matrix_Rotate_X(-20*M_PI/180.0)
+                  * Matrix_Rotate_Z(axe_angle*M_PI/180.0)
+                  * Matrix_Scale(0.002f, 0.002f, 0.002f);
+            glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            glUniform1i(object_id_uniform, AXE);
+            DrawVirtualObject("Cube");
+            DrawVirtualObject("Plane");
+            DrawVirtualObject("Cube.001");
+        }
 
         // Desenhamos os objetos
         model = Matrix_Translate(-4.0f, 0.0f, -10.0f)
@@ -711,17 +800,53 @@ int main(int argc, char* argv[])
         glUniform1i(object_id_uniform, CHARACTER_CAPA);
         DrawVirtualObject("capa");
 
-        // Desenhamos os objetos
-        model = Matrix_Translate(x1+x*0.1f, y1-0.65f, z1+z*0.1f)
-              * Matrix_Rotate_Y(g_CameraTheta + 90*M_PI/180.0)
-              * Matrix_Rotate_X(-20*M_PI/180.0)
-              * Matrix_Rotate_Z(axe_angle*M_PI/180.0)
-              * Matrix_Scale(0.002f, 0.002f, 0.002f);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, AXE);
-        DrawVirtualObject("Cube");
-        DrawVirtualObject("Plane");
-        DrawVirtualObject("Cube.001");
+        if(pointSphereCollision(camera_position_c,
+                                glm::vec3(3.04f, 2.5f, -10.26f),
+                                2.0f)){
+
+            x1 = prev_x1;
+            z1 = prev_z1;
+        }
+
+        if(pointSphereCollision(camera_position_c,
+                                glm::vec3(3.04f, 2.5f, -10.26f),
+                                7.7f)){
+
+            TextRendering_PrintString(window, dialog_text[0+(level*3)], -0.565f, -0.65f, 1.2f);
+            TextRendering_PrintString(window, dialog_text[1+(level*3)], -0.565f, -0.72f, 1.2f);
+            TextRendering_PrintString(window, dialog_text[2+(level*3)], -0.565f, -0.79f, 1.2f);
+
+            if(level == 0 && accepted_quest){
+                level = 1;
+                broken_trees = 0;
+            }
+            else if(level == 1 && broken_trees >= 3){
+                accepted_quest = false;
+                level = 2;
+                broken_trees = 0;
+            }
+            else if(level == 2 && broken_trees >= 5){
+                accepted_quest = false;
+                level = 3;
+                broken_trees = 0;
+            }
+            else if(level == 3 && broken_trees >= 10){
+                accepted_quest = false;
+                level = 4;
+                broken_trees = 0;
+            }
+        }
+
+        sprintf(broken,"%d", broken_trees);
+        TextRendering_PrintString(window, "Arvores cortadas: ", -0.99f, 0.95f, 1.0f);
+        TextRendering_PrintString(window, broken, -0.78f, 0.95f, 1.0f);
+
+        TextRendering_PrintString(window, delay_left, -0.05f, 0.0f, 1.0f);
+
+        if(!camera_type && !start_game){
+            TextRendering_PrintString(window, "         Timberman          ", -0.25f, 0.035f, 1.5f);
+            TextRendering_PrintString(window, "Pressione [ENTER] para jogar", -0.25f, -0.035f, 1.5f);
+        }
 
         TextRendering_ShowFramesPerSecond(window);
         glfwSwapBuffers(window);
@@ -744,6 +869,16 @@ glm::vec3 getBezierCurve(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, glm::vec2 p3,
 
     return glm::vec3(x, 0.0f, z);
 }
+
+glm::vec3 get3DBezierCurve(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t){
+
+    float x = pow(1-t,3)*p0.x + 3*t*pow(1-t,2)*p1.x + 3*pow(t,2)*(1-t)*p2.x + pow(t,3)*p3.x;
+    float y = pow(1-t,3)*p0.y + 3*t*pow(1-t,2)*p1.y + 3*pow(t,2)*(1-t)*p2.y + pow(t,3)*p3.y;
+    float z = pow(1-t,3)*p0.z + 3*t*pow(1-t,2)*p1.z + 3*pow(t,2)*(1-t)*p2.z + pow(t,3)*p3.z;
+
+    return glm::vec3(x, y, z);
+}
+
 
 glm::vec4 GetUserInput(GLFWwindow* window, float x, float y, float z){
 
@@ -773,9 +908,38 @@ glm::vec4 GetUserInput(GLFWwindow* window, float x, float y, float z){
         mov = 6;
     }
 
+    if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS){
+        start_game = true;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS){
+        accepted_quest = true;
+    }
+    else{
+        accepted_quest = false;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
+    {
+        LoadShadersFromFiles();
+        fprintf(stdout,"Shaders recarregados!\n");
+        fflush(stdout);
+    }
+
+    sprintf(delay_left, " ");
+
     if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && can_chop){
         axe_angle = sin(8*timer)*20;
         timer += dt;
+
+        sprintf(delay_left, "%.1fs", (delay_cut_tree - timer));
+
+        if(timer >= delay_cut_tree){
+            broke_tree[choppable] = true;
+            trunk_pos[choppable] = glm::vec2(x1+x, z1+z);
+            broken_trees++;
+            can_chop = false;
+        }
     }
     else{
         if(int(axe_angle) != 0){
@@ -901,7 +1065,7 @@ void getAllObjectsInFile(const char* filename){
 
     while(fscanf(f, "%s ", aux) != EOF){
         if(strcmp(aux, "o") == 0){
-            fscanf(f, "%s\n", obj_names[sizeObjModels]);
+            fscanf(f, "%[^\n]", obj_names[sizeObjModels]);
             //printf("%s\n", obj_names[sizeObjModels]);
             sizeObjModels++;
         }

@@ -12,7 +12,6 @@ in vec4 position_model;
 
 // Coordenadas de textura obtidas do arquivo OBJ (se existirem!)
 in vec2 texcoords;
-in vec4 cor_v;
 
 // Matrizes computadas no código C++ e enviadas para a GPU
 uniform mat4 model;
@@ -72,7 +71,7 @@ void main()
     vec4 n = normalize(normal);
 
     // Vetor que define o sentido da fonte de luz em relação ao ponto atual.
-    vec4 l = normalize(vec4(3.0,0.8,2.0,0.0));
+    vec4 l = normalize(vec4(1.0,1.0,0.0,0.0));
 
     // Vetor que define o sentido da câmera em relação ao ponto atual.
     vec4 v = normalize(camera_position - p);
@@ -115,8 +114,6 @@ void main()
         Ks = vec3(0.0,0.0,0.0);
         Ka = Kd/2.0;
         q  = 1.0;
-        //color.rgb = cor_v;
-        //return;
     }
     else if ( object_id == MOUNTAINS )
     {
@@ -126,11 +123,9 @@ void main()
 
         // Propriedades espectrais
         Kd = texture(TextureImage1, vec2(U,V)).rgb;
-        Ks = vec3(0.6,0.6,0.6);
-        Ka = Kd/6.0;
-        q  = 200.0;
-        //color.rgb = cor_v;
-        //return;
+        Ks = vec3(0.0,0.0,0.0);
+        Ka = Kd/2.0;
+        q  = 1.0;
     }
     else if ( object_id == CHARACTER )
     {
@@ -140,9 +135,9 @@ void main()
 
         // Propriedades espectrais
         Kd = texture(TextureImage4, vec2(U,V)).rgb;
-        Ks = vec3(0.7,0.7,0.7);
-        Ka = Kd/4.0;
-        q  = 32.0;
+        Ks = vec3(0.0,0.0,0.0);
+        Ka = Kd/2.0;
+        q  = 1.0;
     }
     else if ( object_id == AXE )
     {
@@ -160,9 +155,9 @@ void main()
         V = (pz-minx)/(maxy-miny);
 
         Kd = texture(TextureImage2, vec2(U,V)).rgb;
-        Ks = vec3(0.6,0.6,0.6);
-        Ka = Kd/5.0;
-        q  = 256.0;
+        Ks = vec3(0.1,0.1,0.1);
+        Ka = Kd/2.0;
+        q  = 15.0;
     }
     else if ( object_id == BIGTREE )
     {
@@ -175,8 +170,6 @@ void main()
         Ks = vec3(0.0,0.0,0.0);
         Ka = Kd/2.0;
         q  = 1.0;
-        //color.rgb = cor_v;
-        //return;
     }
     else if ( object_id == CHARACTER_CAPA )
     {
@@ -186,11 +179,9 @@ void main()
 
         // Propriedades espectrais
         Kd = texture(TextureImage5, vec2(U,V)).rgb;
-        Ks = vec3(0.2,0.2,0.2);
-        Ka = Kd/3.0;
-        q  = 64.0;
-        //color.rgb = cor_v;
-        //return;
+        Ks = vec3(0.0,0.0,0.0);
+        Ka = Kd/2.0;
+        q  = 1.0;
     }
     else if ( object_id == CHICKEN_LEG )
     {
@@ -208,8 +199,8 @@ void main()
         V = texcoords.y;
 
         Kd = vec3(0.976, 0.972, 0.960);
-        Ks = vec3(0.0,0.0,0.0);
-        Ka = Kd/5.0;
+        Ks = vec3(0.2,0.2,0.2);
+        Ka = Kd/2.0;
         q  = 1.0;
     }
     else if ( object_id == CHICKEN_EYE )
@@ -260,9 +251,11 @@ void main()
     // Termo especular utilizando o modelo de iluminação de Phong
     vec3 phong_specular_term  = Ks*I*pow(max(0.0,dot(r,v)), q);
 
-    vec4 meiaDir = normalize(l + v);
+    // Half-vector de Blinn-Phong
+    vec4 half_vector = normalize(l+v);
 
-    vec3 blinn_specular_term = Ks*I*pow(max(0.0,dot(n,meiaDir)), q);
+    // Termo especular utilizando o modelo de iluminação de Blinn-Phong
+    vec3 blinn_phong_specular_term = Ks*I*pow(max(0.0,dot(n,half_vector)), q);
 
     // NOTE: Se você quiser fazer o rendering de objetos transparentes, é
     // necessário:
@@ -280,10 +273,12 @@ void main()
 
     // Cor final do fragmento calculada com uma combinação dos termos difuso,
     // especular, e ambiente. Veja slide 129 do documento Aula_17_e_18_Modelos_de_Iluminacao.pdf.
-    color.rgb = lambert_diffuse_term + ambient_term + phong_specular_term;
+    if ( object_id == AXE || object_id == CHICKEN_BODY )
+        color.rgb = lambert_diffuse_term + ambient_term + blinn_phong_specular_term;
+    else
+        color.rgb = lambert_diffuse_term + ambient_term + phong_specular_term;
 
     // Cor final com correção gamma, considerando monitor sRGB.
     // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas
     color.rgb = pow(color.rgb, vec3(1.0,1.0,1.0)/2.2);
 }
-
