@@ -3,7 +3,7 @@ TODO:<br>
 - [X] Interação através de mouse e teclado
 - [X] Objetos virtuais representados através de malhas poligonais complexas
 - [X] Transformações geométricas de objetos virtuais
-- [ ] Implementar uma câmera look-at
+- [X] Implementar uma câmera look-at
 - [X] Implementar uma câmera câmera livre
 - [X] Um objeto virtual ao menos deve ser copiado com duas ou mais instâncias
 - [ ] Utilizar ao menos três tipos de teste de intersecção (por exemplo, um teste cubo-cubo, um teste cubo-plano, e um teste ponto-esfera)
