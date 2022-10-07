@@ -95,6 +95,7 @@ void main()
 
     if ( object_id == TERRAIN )
     {
+        // Coordenadas de textura do plano, obtidas do arquivo OBJ
         U = texcoords.x;
         V = texcoords.y;
 
@@ -141,7 +142,7 @@ void main()
     }
     else if ( object_id == AXE )
     {
-        // Coordenadas de textura do plano, obtidas do arquivo OBJ
+        // Projeção planar XZ
         float minx = bbox_min.x;
         float maxx = bbox_max.x;
 
@@ -185,6 +186,7 @@ void main()
     }
     else if ( object_id == CHICKEN_LEG )
     {
+        // Coordenadas de textura do plano, obtidas do arquivo OBJ
         U = texcoords.x;
         V = texcoords.y;
 
@@ -195,6 +197,7 @@ void main()
     }
     else if ( object_id == CHICKEN_BODY )
     {
+        // Coordenadas de textura do plano, obtidas do arquivo OBJ
         U = texcoords.x;
         V = texcoords.y;
 
@@ -205,6 +208,7 @@ void main()
     }
     else if ( object_id == CHICKEN_EYE )
     {
+        // Coordenadas de textura do plano, obtidas do arquivo OBJ
         U = texcoords.x;
         V = texcoords.y;
 
@@ -215,6 +219,7 @@ void main()
     }
     else if ( object_id == CHICKEN_COMB )
     {
+        // Coordenadas de textura do plano, obtidas do arquivo OBJ
         U = texcoords.x;
         V = texcoords.y;
 

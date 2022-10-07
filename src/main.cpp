@@ -259,12 +259,12 @@ int main(int argc, char* argv[])
 
     // Carrega os modelos das pedras da montanha
     const char* filename[rock_types] = {"../../data/stone_1.obj",
-                                         "../../data/stone_with_moss_2.obj",
-                                         "../../data/stone_3.obj",
-                                         "../../data/stone_4.obj",
-                                         "../../data/stone_with_moss_5.obj",
-                                         "../../data/stone_6.obj",
-                                         "../../data/stone_7.obj"};
+                                        "../../data/stone_with_moss_2.obj",
+                                        "../../data/stone_3.obj",
+                                        "../../data/stone_4.obj",
+                                        "../../data/stone_with_moss_5.obj",
+                                        "../../data/stone_6.obj",
+                                        "../../data/stone_7.obj"};
     for(int i=0; i<rock_types; i++){
         ObjModel mountain(filename[i]);
         ComputeNormals(&mountain);
