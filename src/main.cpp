@@ -219,7 +219,7 @@ int main(int argc, char* argv[])
     // Muda o ícone da janela
     // FONTE: https://stackoverflow.com/questions/44321902/glfw-setwindowicon
     GLFWimage images[1];
-    images[0].pixels = stbi_load("../../data/textures/icon.png", &images[0].width, &images[0].height, 0, 4); //rgba channels
+    images[0].pixels = stbi_load("../../data/textures/icon.png", &images[0].width, &images[0].height, 0, 4);
     glfwSetWindowIcon(window, 1, images);
     stbi_image_free(images[0].pixels);
 
